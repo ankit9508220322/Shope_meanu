@@ -7,6 +7,8 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&family=Baloo+2:wght@600;700;800&display=swap');
@@ -1126,6 +1128,84 @@
 
 <script>
 /* =========================================================================
+   VIDYA ELECTRIC — CLOUD SYNC (Firebase Firestore)
+   -------------------------------------------------------------------------
+   जो भी सामान/बिल किसी भी फ़ोन से add/edit/delete किया जाए, वह Firestore के
+   ज़रिए बाकी सभी फ़ोन पर अपने-आप, तुरंत sync हो जाता है। इंटरनेट न हो तो site
+   localStorage से (उसी फ़ोन पर) पहले जैसे काम करती रहती है — इंटरनेट वापस आते
+   ही अपने-आप sync हो जाता है।
+   ========================================================================= */
+  const firebaseConfig = {
+    apiKey: "AIzaSyDA2yKr35tP-qDl2B2UjRp8QgvvubLvAno",
+    authDomain: "vidyaeletrick.firebaseapp.com",
+    projectId: "vidyaeletrick",
+    storageBucket: "vidyaeletrick.firebasestorage.app",
+    messagingSenderId: "1057605344265",
+    appId: "1:1057605344265:web:78de9ae139dcfc29906cd8"
+  };
+  let db = null;
+  let cloudReady = false;
+  let applyingRemoteUpdate = false; // remote से आया update वापस cloud पर push न हो, इसलिए guard
+  let firebaseInitPromise = null;
+
+  // Firebase Compat SDK is loaded from the official CDN above. If a browser/cache
+  // failed to load it, retry once before falling back to localStorage-only mode.
+  function loadFirebaseScript(src){
+    return new Promise((resolve, reject)=>{
+      const existing = document.querySelector(`script[src=\"${src}\"]`);
+      if(existing){
+        if(window.firebase) return resolve();
+        existing.addEventListener('load', resolve, {once:true});
+        existing.addEventListener('error', reject, {once:true});
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = src;
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+
+  async function initFirebase(){
+    if(firebaseInitPromise) return firebaseInitPromise;
+    firebaseInitPromise = (async()=>{
+      try{
+        if(!window.firebase){
+          await loadFirebaseScript('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
+        }
+        if(!window.firebase || typeof window.firebase.initializeApp !== 'function'){
+          throw new Error('Firebase App SDK load नहीं हुआ');
+        }
+        if(!Array.isArray(window.firebase.apps) || !window.firebase.apps.length){
+          window.firebase.initializeApp(firebaseConfig);
+        }
+        if(typeof window.firebase.firestore !== 'function'){
+          await loadFirebaseScript('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js');
+        }
+        if(typeof window.firebase.firestore !== 'function'){
+          throw new Error('Firebase Firestore SDK load नहीं हुआ');
+        }
+        db = window.firebase.firestore();
+        cloudReady = true;
+        return true;
+      }catch(e){
+        cloudReady = false;
+        console.warn('Cloud sync शुरू नहीं हो सका, site offline (सिर्फ़ इसी फ़ोन पर) काम करेगी:', e);
+        return false;
+      }
+    })();
+    return firebaseInitPromise;
+  }
+
+  const CLOUD_COLLECTION = 'vidya_electric_shared';
+  function cloudPush(docName, payload){
+    if(!cloudReady || applyingRemoteUpdate) return;
+    db.collection(CLOUD_COLLECTION).doc(docName).set({ data: payload, updatedAt: Date.now() }, {merge:false})
+      .catch(err=> console.warn('Cloud sync fail (' + docName + '):', err));
+  }
+
+/* =========================================================================
    VIDYA ELECTRIC — PRODUCT DATA
    -------------------------------------------------------------------------
    दुकान का मालिक यहाँ आसानी से बदलाव कर सकता है:
@@ -1315,6 +1395,7 @@
   function saveCustomProducts(){
     try{ localStorage.setItem(CUSTOM_PRODUCTS_KEY, JSON.stringify(customProducts)); }
     catch(e){ alert('सामान सेव करने में समस्या हुई। हो सकता है फ़ोटो का साइज़ बड़ा हो — छोटी फ़ोटो आज़माएं।'); }
+    cloudPush('products', customProducts);
   }
   let customProducts = loadCustomProducts();
 
@@ -1325,6 +1406,7 @@
   }
   function saveDeletedProducts(){
     try{ localStorage.setItem(DELETED_PRODUCTS_KEY, JSON.stringify(deletedProducts)); }catch(e){}
+    cloudPush('deletedProducts', deletedProducts);
   }
   let deletedProducts = loadDeletedProducts();
 
@@ -1774,6 +1856,7 @@
   function saveBills(list){
     try{ localStorage.setItem(BILL_STORE_KEY, JSON.stringify(list)); }
     catch(e){ alert('बिल सेव करने में समस्या हुई। कृपया दोबारा कोशिश करें।'); }
+    cloudPush('bills', list);
   }
 
   let bills = loadBills();
@@ -1785,6 +1868,7 @@
   }
   function saveDeletedBills(){
     try{ localStorage.setItem(DELETED_BILLS_KEY, JSON.stringify(deletedBills)); }catch(e){}
+    cloudPush('deletedBills', deletedBills);
   }
   let deletedBills = loadDeletedBills();
   let billSearchTerm = '';
@@ -2387,6 +2471,61 @@
     };
     reader.readAsArrayBuffer(file);
   });
+
+  /* ===================== Cloud Sync — activate real-time listeners ===================== */
+  async function setupCloudSync(){
+    const ready = await initFirebase();
+    if(!ready) return;
+    const col = db.collection(CLOUD_COLLECTION);
+
+    col.doc('products').onSnapshot(snap=>{
+      if(!snap.exists){ cloudPush('products', customProducts); return; }
+      const remote = snap.data().data;
+      if(!Array.isArray(remote)) return;
+      applyingRemoteUpdate = true;
+      customProducts = remote;
+      try{ localStorage.setItem(CUSTOM_PRODUCTS_KEY, JSON.stringify(customProducts)); }catch(e){}
+      refreshAllProducts();
+      renderFilterChips();
+      renderCatDirectory();
+      renderMyProductsList();
+      applyingRemoteUpdate = false;
+    }, err=> console.warn('products cloud sync error:', err));
+
+    col.doc('deletedProducts').onSnapshot(snap=>{
+      if(!snap.exists){ cloudPush('deletedProducts', deletedProducts); return; }
+      const remote = snap.data().data;
+      if(!Array.isArray(remote)) return;
+      applyingRemoteUpdate = true;
+      deletedProducts = remote;
+      try{ localStorage.setItem(DELETED_PRODUCTS_KEY, JSON.stringify(deletedProducts)); }catch(e){}
+      renderRecovery();
+      applyingRemoteUpdate = false;
+    }, err=> console.warn('deletedProducts cloud sync error:', err));
+
+    col.doc('bills').onSnapshot(snap=>{
+      if(!snap.exists){ cloudPush('bills', bills); return; }
+      const remote = snap.data().data;
+      if(!Array.isArray(remote)) return;
+      applyingRemoteUpdate = true;
+      bills = remote;
+      try{ localStorage.setItem(BILL_STORE_KEY, JSON.stringify(bills)); }catch(e){}
+      renderBillTable();
+      applyingRemoteUpdate = false;
+    }, err=> console.warn('bills cloud sync error:', err));
+
+    col.doc('deletedBills').onSnapshot(snap=>{
+      if(!snap.exists){ cloudPush('deletedBills', deletedBills); return; }
+      const remote = snap.data().data;
+      if(!Array.isArray(remote)) return;
+      applyingRemoteUpdate = true;
+      deletedBills = remote;
+      try{ localStorage.setItem(DELETED_BILLS_KEY, JSON.stringify(deletedBills)); }catch(e){}
+      renderRecovery();
+      applyingRemoteUpdate = false;
+    }, err=> console.warn('deletedBills cloud sync error:', err));
+  }
+  setupCloudSync();
 </script>
 </body>
 </html>
