@@ -7,8 +7,6 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&family=Baloo+2:wght@600;700;800&display=swap');
@@ -1126,15 +1124,22 @@
   </div>
 </div>
 
-<script>
+<script type="module">
 /* =========================================================================
-   VIDYA ELECTRIC — CLOUD SYNC (Firebase Firestore)
+   VIDYA ELECTRIC — CLOUD SYNC (Firebase Firestore, Modular SDK v10)
    -------------------------------------------------------------------------
+   यह project plain HTML/JS है (कोई npm/bundler नहीं) — इसलिए Firebase का
+   Modular SDK सीधे gstatic के ESM build से import किया गया है (npm install
+   की ज़रूरत नहीं)। पूरा <script> टैग इसीलिए type="module" है।
+
    जो भी सामान/बिल किसी भी फ़ोन से add/edit/delete किया जाए, वह Firestore के
    ज़रिए बाकी सभी फ़ोन पर अपने-आप, तुरंत sync हो जाता है। इंटरनेट न हो तो site
    localStorage से (उसी फ़ोन पर) पहले जैसे काम करती रहती है — इंटरनेट वापस आते
    ही अपने-आप sync हो जाता है।
    ========================================================================= */
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
   const firebaseConfig = {
     apiKey: "AIzaSyDA2yKr35tP-qDl2B2UjRp8QgvvubLvAno",
     authDomain: "vidyaeletrick.firebaseapp.com",
@@ -1146,62 +1151,16 @@
   let db = null;
   let cloudReady = false;
   let applyingRemoteUpdate = false; // remote से आया update वापस cloud पर push न हो, इसलिए guard
-  let firebaseInitPromise = null;
-
-  // Firebase Compat SDK is loaded from the official CDN above. If a browser/cache
-  // failed to load it, retry once before falling back to localStorage-only mode.
-  function loadFirebaseScript(src){
-    return new Promise((resolve, reject)=>{
-      const existing = document.querySelector(`script[src=\"${src}\"]`);
-      if(existing){
-        if(window.firebase) return resolve();
-        existing.addEventListener('load', resolve, {once:true});
-        existing.addEventListener('error', reject, {once:true});
-        return;
-      }
-      const script = document.createElement('script');
-      script.src = src;
-      script.onload = resolve;
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
-  }
-
-  async function initFirebase(){
-    if(firebaseInitPromise) return firebaseInitPromise;
-    firebaseInitPromise = (async()=>{
-      try{
-        if(!window.firebase){
-          await loadFirebaseScript('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
-        }
-        if(!window.firebase || typeof window.firebase.initializeApp !== 'function'){
-          throw new Error('Firebase App SDK load नहीं हुआ');
-        }
-        if(!Array.isArray(window.firebase.apps) || !window.firebase.apps.length){
-          window.firebase.initializeApp(firebaseConfig);
-        }
-        if(typeof window.firebase.firestore !== 'function'){
-          await loadFirebaseScript('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js');
-        }
-        if(typeof window.firebase.firestore !== 'function'){
-          throw new Error('Firebase Firestore SDK load नहीं हुआ');
-        }
-        db = window.firebase.firestore();
-        cloudReady = true;
-        return true;
-      }catch(e){
-        cloudReady = false;
-        console.warn('Cloud sync शुरू नहीं हो सका, site offline (सिर्फ़ इसी फ़ोन पर) काम करेगी:', e);
-        return false;
-      }
-    })();
-    return firebaseInitPromise;
-  }
+  try{
+    const fbApp = initializeApp(firebaseConfig);
+    db = getFirestore(fbApp);
+    cloudReady = true;
+  }catch(e){ console.warn('Cloud sync शुरू नहीं हो सका, site offline (सिर्फ़ इसी फ़ोन पर) काम करेगी:', e); }
 
   const CLOUD_COLLECTION = 'vidya_electric_shared';
   function cloudPush(docName, payload){
     if(!cloudReady || applyingRemoteUpdate) return;
-    db.collection(CLOUD_COLLECTION).doc(docName).set({ data: payload, updatedAt: Date.now() }, {merge:false})
+    setDoc(doc(db, CLOUD_COLLECTION, docName), { data: payload, updatedAt: Date.now() })
       .catch(err=> console.warn('Cloud sync fail (' + docName + '):', err));
   }
 
@@ -2473,13 +2432,11 @@
   });
 
   /* ===================== Cloud Sync — activate real-time listeners ===================== */
-  async function setupCloudSync(){
-    const ready = await initFirebase();
-    if(!ready) return;
-    const col = db.collection(CLOUD_COLLECTION);
+  function setupCloudSync(){
+    if(!cloudReady) return;
 
-    col.doc('products').onSnapshot(snap=>{
-      if(!snap.exists){ cloudPush('products', customProducts); return; }
+    onSnapshot(doc(db, CLOUD_COLLECTION, 'products'), snap=>{
+      if(!snap.exists()) return;
       const remote = snap.data().data;
       if(!Array.isArray(remote)) return;
       applyingRemoteUpdate = true;
@@ -2492,8 +2449,8 @@
       applyingRemoteUpdate = false;
     }, err=> console.warn('products cloud sync error:', err));
 
-    col.doc('deletedProducts').onSnapshot(snap=>{
-      if(!snap.exists){ cloudPush('deletedProducts', deletedProducts); return; }
+    onSnapshot(doc(db, CLOUD_COLLECTION, 'deletedProducts'), snap=>{
+      if(!snap.exists()) return;
       const remote = snap.data().data;
       if(!Array.isArray(remote)) return;
       applyingRemoteUpdate = true;
@@ -2503,8 +2460,8 @@
       applyingRemoteUpdate = false;
     }, err=> console.warn('deletedProducts cloud sync error:', err));
 
-    col.doc('bills').onSnapshot(snap=>{
-      if(!snap.exists){ cloudPush('bills', bills); return; }
+    onSnapshot(doc(db, CLOUD_COLLECTION, 'bills'), snap=>{
+      if(!snap.exists()) return;
       const remote = snap.data().data;
       if(!Array.isArray(remote)) return;
       applyingRemoteUpdate = true;
@@ -2514,8 +2471,8 @@
       applyingRemoteUpdate = false;
     }, err=> console.warn('bills cloud sync error:', err));
 
-    col.doc('deletedBills').onSnapshot(snap=>{
-      if(!snap.exists){ cloudPush('deletedBills', deletedBills); return; }
+    onSnapshot(doc(db, CLOUD_COLLECTION, 'deletedBills'), snap=>{
+      if(!snap.exists()) return;
       const remote = snap.data().data;
       if(!Array.isArray(remote)) return;
       applyingRemoteUpdate = true;
