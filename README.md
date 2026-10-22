@@ -1,111 +1,42 @@
-# ⚡ VIDYA ELECTRIC — Electrical Shop Management & Product Catalogue
+# ⚡ VIDYA ELECTRIC – Electrical Shop Website
 
-A modern and responsive **Electrical Shop Product Catalogue & Billing System** built with **HTML, CSS and JavaScript**.
-
-This project is designed for **VIDYA ELECTRIC**, an electrical shop located at Buxar Road, Kochas (Rohtas). It provides an easy way to display products, manage shop products, communicate with customers through WhatsApp, and handle billing records.
+**Vidya Electric** is a simple and responsive website made for an electrical shop. It helps customers view products and helps the shop owner manage products and bills.
 
 ## 🚀 Features
 
-### 🛒 Product Catalogue
-- Browse electrical products
-- Search products by name
-- Product categories
-- Product images
-- Product price and availability
-- Product details popup
-- Add custom shop products
-- Edit and delete custom products
-- Track sold and remaining quantity
-
-### 📱 WhatsApp Integration
-Customers can directly contact the shop through WhatsApp to ask about:
-- Product price
-- Product availability
-- Product information
-
-### 🧾 Billing System
-- Create customer bills
-- Add multiple products/items
-- Calculate total amount
-- Record paid amount
-- Track remaining/due amount
-- Save bills
-- Search saved bills by customer name, phone number or bill number
-
-### 💾 Backup & Restore
-The project includes an Excel-based backup system.
-
-- Export bills and products to `.xlsx`
-- Restore data from Excel backup
-- Bills, bill items and products are stored in separate Excel sheets
-- Useful for keeping shop data safe
-
-> Note: Product photos are not included in the Excel backup.
-
-### ♻️ Recovery System
-Deleted custom products are temporarily kept in the recovery section, allowing them to be recovered instead of being immediately lost.
-
-### 📱 Responsive Design
-The website is designed to work on:
-- 💻 Desktop
-- 📱 Mobile
-- 📲 Tablet
+- 🛒 View electrical products
+- 🔍 Search products
+- 📦 Add, edit and delete products
+- 💰 Manage product prices and quantities
+- 🧾 Create and save customer bills
+- 💵 Track paid and remaining amounts
+- 📊 Backup and restore data using Excel
+- ♻️ Recover deleted products
+- 📱 Responsive on mobile, tablet and desktop
+- 📞 Call and WhatsApp customer support
+- 📍 Google Maps location support
 
 ## 🛠️ Technologies Used
 
 - HTML5
 - CSS3
 - JavaScript
-- HTML2Canvas
 - SheetJS / XLSX
+- HTML2Canvas
 - Responsive Web Design
-
-## ⚡ Electrical Products
-
-The catalogue can display products such as:
-
-- 💡 LED Bulbs
-- 🔌 Switches
-- ⚡ Wires & Cables
-- 🌀 Fans
-- ❄️ Coolers
-- 🔧 Electrical Accessories
-- 📺 TV Cable
-- 🔋 Chargers
-- 🔥 Iron
-- 🥤 Mixer
-- 🎆 Decorative / Diwali Lights
-
-## 📍 Shop Information
-
-**VIDYA ELECTRIC**
-
-📍 Buxar Road, Kochas — Purana Dak Bangla Market  
-📞 +91 85216 90149
-
-The website also provides direct **Call, WhatsApp and Google Maps directions** for customers.
 
 ## 🎯 Project Purpose
 
-The main purpose of this project is to create a simple digital system for an electrical shop where customers can view products while the shop owner can manage products and billing records from the same website.
+The main goal of this project is to make daily shop work easier by providing **product management, billing and customer support in one website**.
 
-## 🔮 Future Improvements
+## 📍 Shop
 
-- Firebase/Cloud database integration
-- Online customer orders
-- User authentication
-- Stock management
-- Sales reports
-- Daily/monthly sales analytics
-- Admin dashboard
-- Online payment integration
+**VIDYA ELECTRIC**  
+Buxar Road, Kochas – Purana Dak Bangla Market, Rohtas
 
 ## 👨‍💻 Developer
 
-**Ankit Kumar Choubey**
-
+**Ankit Kumar Choubey**  
 BCA Student | Aspiring Data Analyst | Web & Data Analytics Enthusiast
 
----
-
-⭐ If you find this project useful, consider giving the repository a **Star**.
+⭐ If you like this project, please give the repository a Star!
